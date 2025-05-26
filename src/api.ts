@@ -3,6 +3,7 @@ import { Multiaddr } from '@multiformats/multiaddr'
 
 export interface ProviderHint {
   multiaddr: Multiaddr
+  protos?: string[]
 }
 
 export type { CID, Multiaddr }
