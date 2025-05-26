@@ -36,6 +36,10 @@ export function createUri({ base, path, providers = [] }) {
     const baseParts = provider.multiaddr.toString().split('/')
     const hintParts = [...baseParts]
 
+    for (const proto of provider.protos || []) {
+      if (proto) hintParts.push('retrieval', proto)
+    }
+
     const hint = '/' + hintParts.filter(Boolean).join('/')
     url.searchParams.append('provider', hint)
   }
@@ -79,9 +83,25 @@ export function parseQueryString(query) {
   for (const val of searchParams.getAll('provider')) {
     if (!val.startsWith('/')) continue
 
+    const protoParts = val.split('/').filter(Boolean)
+    /** @type {string[]} */
+    const protos = []
+
+    for (let i = 0; i < protoParts.length; ) {
+      if (protoParts[i] === 'retrieval') {
+        i++
+        if (i < protoParts.length) {
+          protos.push(protoParts[i])
+          i++
+        }
+      } else {
+        i++
+      }
+    }
+
     try {
       const m = multiaddr(val)
-      providers.push({ multiaddr: m })
+      providers.push({ multiaddr: m, protos })
     } catch {
       // Skip malformed multiaddrs
       continue
