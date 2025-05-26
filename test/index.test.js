@@ -1,7 +1,7 @@
 /* global console */
 
 import assert from 'assert'
-import { multiaddr } from '@vascosantos/multiaddr'
+import { multiaddr } from '@multiformats/multiaddr'
 
 import { createUri, parseUri, parseQueryString } from '../src/index.js'
 

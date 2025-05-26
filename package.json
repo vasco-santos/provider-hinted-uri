@@ -28,7 +28,7 @@
     "test:browser": "playwright-test --runner mocha 'test/**/!(*.node).test.js'"
   },
   "dependencies": {
-    "@vascosantos/multiaddr": "^12.4.1",
+    "@multiformats/multiaddr": "^12.4.0",
     "multiformats": "^13.3.6"
   },
   "devDependencies": {

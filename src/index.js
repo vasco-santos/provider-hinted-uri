@@ -1,6 +1,6 @@
 import * as API from './api.js'
 
-import { multiaddr, isMultiaddr } from '@vascosantos/multiaddr'
+import { multiaddr, isMultiaddr } from '@multiformats/multiaddr'
 import { CID } from 'multiformats/cid'
 
 /**
