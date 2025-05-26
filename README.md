@@ -31,7 +31,7 @@ Constructs a URI with optional provider hints and an optional path.
 
 - `path` (`string`, optional): Path to append to the CID, e.g., `/foo/bar`. This will be appended to the resolved base form `/ipfs/<CID>`.
 
-- `providers` (`ProviderHint[]`, optional): A list of provider hints, each consisting of a `multiaddr` and optional `protos` array.
+- `providers` (`ProviderHint[]`, optional): A list of provider hints, each consisting of a `multiaddr`.
 
 #### Returns
 
@@ -48,18 +48,16 @@ const uri = createUri({
   path: '/dir/file.txt',
   providers: [
     {
-      multiaddr: multiaddr('/ip4/1.2.3.4/tcp/1234/https'),
-      protos: ['http']
+      multiaddr: multiaddr('/ip4/1.2.3.4/tcp/1234/https')
     },
     {
-      multiaddr: multiaddr('/ip4/1.2.3.4/tcp/8000/ws/p2p/Qm...'),
-      protos: ['bitswap']
+      multiaddr: multiaddr('/ip4/1.2.3.4/tcp/8000/ws/p2p/Qm...')
     }
   ]
 })
 
 console.log(uri.toString())
-// ipfs://bafybeigdyrzt.../dir/file.txt?provider=/ip4/1.2.3.4/tcp/1234/https/retrieval/http&provider=/ip4/1.2.3.4/tcp/8000/ws/p2p/Qm.../retrieval/bitswap
+// ipfs://bafybeigdyrzt.../dir/file.txt?provider=/ip4/1.2.3.4/tcp/1234/https&provider=/ip4/1.2.3.4/tcp/8000/ws/p2p/Qm...
 ```
 
 ---
@@ -84,8 +82,7 @@ Parses a URI and extracts the CID, provider hints, and path.
 
 - `cid`: The parsed CID extracted from the URI.
 - `providers`: An array of provider hints, each with:
-  - `multiaddr`: A `Multiaddr` instance (includes any `/retrieval/<proto>` segments)
-  - `protos`: An array of retrieval protocol strings (e.g., `['http', 'bitswap']`)
+  - `multiaddr`: A `Multiaddr` instance
 - `path`: The normalized path segment of the URI (e.g., `/dir/file.txt`)
 
 #### Example
@@ -94,13 +91,12 @@ Parses a URI and extracts the CID, provider hints, and path.
 import { parseUri } from 'provider-hinted-uri'
 
 const parsed = parseUri(
-  'ipfs://bafybeigdyrzt.../foo.txt?provider=/ip4/1.2.3.4/tcp/1234/retrieval/bitswap/retrieval/graphsync'
+  'ipfs://bafybeigdyrzt.../foo.txt?provider=/ip4/1.2.3.4/tcp/1234'
 )
 
 console.log(parsed.cid.toString())       // bafybeigdyrzt...
 console.log(parsed.path)                 // /foo.txt
-console.log(parsed.providers[0].multiaddr.toString()) // /ip4/1.2.3.4/tcp/1234/retrieval/bitswap/retrieval/graphsync
-console.log(parsed.providers[0].protos)  // ['bitswap', 'graphsync']
+console.log(parsed.providers[0].multiaddr.toString()) // /ip4/1.2.3.4/tcp/1234
 ```
 
 ---
@@ -115,17 +111,16 @@ Parses query parameters (string or `URLSearchParams`) to extract provider hints.
 
 #### Returns
 
-- `ProviderHint[]`: Array of provider hints with `multiaddr` and `protos`.
+- `ProviderHint[]`: Array of provider hints with `multiaddr`.
 
 #### Example
 
 ```js
 import { parseQueryString } from 'provider-hinted-uri'
 
-const providers = parseQueryString('provider=/ip4/1.2.3.4/tcp/1234/retrieval/https&provider=/ip4/1.2.3.4/tcp/5678/ws')
+const providers = parseQueryString('provider=/ip4/1.2.3.4/tcp/1234&provider=/ip4/1.2.3.4/tcp/5678/ws')
 
-console.log(providers[0].multiaddr.toString()) // /ip4/1.2.3.4/tcp/1234/retrieval/https
-console.log(providers[0].protos)               // ['http']
+console.log(providers[0].multiaddr.toString()) // /ip4/1.2.3.4/tcp/1234
 ```
 
 ---
@@ -137,12 +132,10 @@ console.log(providers[0].protos)               // ['http']
 ```ts
 interface ProviderHint {
   multiaddr: Multiaddr
-  protos?: string[]
 }
 ```
 
 - `multiaddr`: A `Multiaddr` instance pointing to the provider.
-- `protos`: An optional list of retrieval protocol strings (e.g., `http`, `bitswap`, etc.).
 
 ---
 
