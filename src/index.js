@@ -36,10 +36,6 @@ export function createUri({ base, path, providers = [] }) {
     const baseParts = provider.multiaddr.toString().split('/')
     const hintParts = [...baseParts]
 
-    for (const proto of provider.protos || []) {
-      if (proto) hintParts.push('retrieval', proto)
-    }
-
     const hint = '/' + hintParts.filter(Boolean).join('/')
     url.searchParams.append('provider', hint)
   }
@@ -52,17 +48,18 @@ export function createUri({ base, path, providers = [] }) {
  * preserving the full multiaddr including `/retrieval/<proto>` segments.
  *
  * @param {string} uri
- * @returns {{ cid: API.CID, providers: API.ProviderHint[], path: string }}
+ * @returns {{ cid: API.CID, providers: API.ProviderHint[], path: string, protocol: string }}
  */
 export function parseUri(uri) {
   const url = new URL(uri)
-  const { cid, normalizedPath: path } = extractComponents(uri)
+  const { cid, normalizedPath: path, protocol } = extractComponents(uri)
   const providers = parseQueryString(url.searchParams)
 
   return {
     cid,
     providers,
     path,
+    protocol,
   }
 }
 
@@ -82,25 +79,9 @@ export function parseQueryString(query) {
   for (const val of searchParams.getAll('provider')) {
     if (!val.startsWith('/')) continue
 
-    const protoParts = val.split('/').filter(Boolean)
-    /** @type {string[]} */
-    const protos = []
-
-    for (let i = 0; i < protoParts.length; ) {
-      if (protoParts[i] === 'retrieval') {
-        i++
-        if (i < protoParts.length) {
-          protos.push(protoParts[i])
-          i++
-        }
-      } else {
-        i++
-      }
-    }
-
     try {
       const m = multiaddr(val)
-      providers.push({ multiaddr: m, protos })
+      providers.push({ multiaddr: m })
     } catch {
       // Skip malformed multiaddrs
       continue
