@@ -157,35 +157,35 @@ Note that the `multiaddr` string should point to the `origin` server where given
 #### Example Parsing Flows
 
 **Input URI:**
-`https://bafy....ipfs.dweb.link/ipfs/bafy...?provider=/dns4/hash-stream-like-server.io/tcp/443/https/retrieval/http`
+`https://bafy....ipfs.dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http`
 → **REJECT** (CID appears in both hostname and path)
 
 **Input URI:**
-`https://dweb.link/ipfs/bafy...?provider=/dns4/hash-stream-like-server.io/tcp/443/https/retrieval/http&provider=/ip4/192.0.2.1/tcp/4001/ws/retrieval/bitswap`
+`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http&provider=/ip4/192.0.2.1/tcp/4001/ws/retrieval/bitswap`
 
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns4/hash-stream-like-server.io/tcp/443/https` using `http`
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http`
 2. `/ip4/192.0.2.1/tcp/4001/ws` using `bitswap`
    → Attempt connections via hints or fall back to default resolution.
 
 **Input URI:**
-`https://dweb.link/ipfs/bafy...?provider=/dns4/hash-stream-like-server.io/tcp/443/https/retrieval/http/retrieval/bitswap`
+`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http/retrieval/bitswap`
 
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns4/hash-stream-like-server.io/tcp/443/https` using `http` or `bitswap`
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http` or `bitswap`
    → Attempt connections via hints or fall back to default resolution.
 
 **Input URI:**
-`https://bafy....ipfs.dweb.link?provider=/dns4/hash-stream-like-server.io/tcp/443/https`
+`https://bafy....ipfs.dweb.link?provider=/dns/hash-stream-like-server.io/tcp/443/https`
 
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns4/hash-stream-like-server.io/tcp/443/https` using `http` (while not explicit, client MAY infer it by http like multiaddr)
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http` (while not explicit, client MAY infer it by http like multiaddr)
 
 ### Client Behavior and potential Server Roles
 
@@ -229,7 +229,7 @@ This flexibility supports a spectrum of use cases—from fully local client-side
 
 ```
 https://example.gateway.io/ipfs/bafy...?
-  provider=/dns4/my-hash-stream-server.com/tcp/443/https
+  provider=/dns/my-hash-stream-server.com/tcp/443/https
   &provider=/ip4/98.10.2.1/tcp/8000/ws/retrieval/http
 ```
 
@@ -237,7 +237,7 @@ https://example.gateway.io/ipfs/bafy...?
 
 ```
 ipfs://bafy...?
-  provider=/dns4/my-hash-stream-server.com/tcp/443/https/retrieval/http
+  provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http
 ```
 
 These providers hints can be evaluated by clients in any order (sequentially or in parallel), or ignored entirely if unsupported.
@@ -261,7 +261,7 @@ This document provides a foundational format but leaves room for future refineme
 ### Human-Friendly URI Format
 
 ```txt!
-https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server/tcp/443/https/retrieval/http
+https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http
 ```
 
 - Easy to paste into a browser.
@@ -273,14 +273,14 @@ https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server/tcp/443/http
 If you paste this URI into a browser:
 
 ```txt!
-ipfs://bafy...?provider=/dns4/my-hash-stream-server/tcp/443/https/retrieval/http
+ipfs://bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http
 ```
 
 - The browser encodes unsafe characters like `/` and `:`.
 - Internally it becomes:
 
 ```txt!
-ipfs://bafy...?provider=%2Fdns4%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Aretrieval%2Fhttp
+ipfs://bafy...?provider=%2Fdns%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Aretrieval%2Fhttp
 ```
 
 ✅ This is expected and does not affect usability.
@@ -288,10 +288,10 @@ ipfs://bafy...?provider=%2Fdns4%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Are
 #### 🧪 JavaScript (Browser or Node.js)
 
 ```js!
-const url = new URL("https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server/tcp/443/https/retrieval/http");
+const url = new URL("https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http");
 const hints = url.searchParams.getAll("provider");
 for (const hint of hints) {
-  console.log("Multiaddr:", hint);  // "/dns4/my-hash-stream-server/tcp/443/https/retrieval/http"
+  console.log("Multiaddr:", hint);  // "/dns/my-hash-stream-server/tcp/443/https/retrieval/http"
 }
 ```
 
@@ -302,7 +302,7 @@ for (const hint of hints) {
 #### 💻 CLI Usage
 
 ```sh!
-curl "https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server/tcp/443/https/retrieval/http"
+curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http"
 ```
 
 - ✅ Use quotes (`"..."` or `'...'`) if your shell interprets special characters.
@@ -330,7 +330,7 @@ Works great in:
       ↓
 [ Client parses CID ]
       ↓
-[ Any provider hints? ] — Yes → Try hints in order (e.g., /dns4/gw.io/...)
+[ Any provider hints? ] — Yes → Try hints in order (e.g., /dns/gw.io/...)
       ↓
     No ↓             ↓
 [ Use fallback discovery: DHT/IPNI/... ]
@@ -341,8 +341,8 @@ Works great in:
 | Use Case                                      | URI                                                                                                                                                         |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ✅ **Basic IPFS URI with no hints**           | `ipfs://bafy...`                                                                                                                                            |
-| ✅ **Gateway-compatible form with HTTP hint** | `https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server.com/tcp/443/https/retrieval/http`                                                      |
-| ✅ **Multiple hints (HTTP + libp2p)**         | `ipfs://bafy...?provider=/dns4/my-hash-stream-server.com/tcp/443/https/retrieval/http &provider=/dns4/peer.ipfs.io/tcp/4001/p2p/QmPeerID/retrieval/bitswap` |
+| ✅ **Gateway-compatible form with HTTP hint** | `https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http`                                                      |
+| ✅ **Multiple hints (HTTP + libp2p)**         | `ipfs://bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http &provider=/dns/peer.ipfs.io/tcp/4001/p2p/QmPeerID/retrieval/bitswap` |
 | ❌ **Unsupported client**                     | Client ignores `provider` param and uses default discovery (e.g., DHT/IPNI)                                                                                 |
 
 ### Usage & Adoption
@@ -362,11 +362,11 @@ Clients MAY evaluate hints sequentially or in parallel and MAY prioritize based 
 This format is designed to be easily usable in CLI pipelines and automation flows. For example:
 
 ```sh!
-curl-like "https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
+curl-like "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
 ```
 
 Assuming curl at some point would adopt content addressable verifiable client, it could look like:
 
 ```sh!
-curl "https://dweb.link/ipfs/bafy...?provider=/dns4/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
+curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
 ```
