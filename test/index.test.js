@@ -1,7 +1,7 @@
 /* global console */
 
 import assert from 'assert'
-import { multiaddr } from '@multiformats/multiaddr'
+import { multiaddr } from '@vascosantos/multiaddr'
 
 import { createUri, parseUri, parseQueryString } from '../src/index.js'
 
@@ -30,10 +30,10 @@ describe('creates and parses provider-hinted-uris', () => {
     assert.deepStrictEqual(parsed.providers, [])
   })
 
-  it('parses provider hint with multiple retrieval markers', () => {
+  it('parses provider hint with multiple tag markers', () => {
     const base = `https://example.com/ipfs/${cidStr}`
     const url = new URL(base)
-    const appendedMultiaddr = `${maddr.toString()}/retrieval/http/retrieval/bitswap`
+    const appendedMultiaddr = `${maddr.toString()}/tag/http/tag/bitswap`
     url.searchParams.append('provider', appendedMultiaddr)
     const parsed = parseUri(url.toString())
 
@@ -42,7 +42,7 @@ describe('creates and parses provider-hinted-uris', () => {
       parsed.providers[0].multiaddr.toString(),
       appendedMultiaddr
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, ['http', 'bitswap'])
+    assert.deepStrictEqual(parsed.providers[0].tags, ['http', 'bitswap'])
   })
 
   it('throws on ambiguous subdomain + path format', () => {
@@ -50,11 +50,11 @@ describe('creates and parses provider-hinted-uris', () => {
     assert.throws(() => parseUri(uri), /ambiguous/)
   })
 
-  it('creates URI with provider hints (no protos)', () => {
+  it('creates URI with provider hints (no tags)', () => {
     const base = `https://example.com/ipfs/${cidStr}`
     const uri = createUri({
       base,
-      providers: [{ multiaddr: maddr, protos: [] }],
+      providers: [{ multiaddr: maddr, tags: [] }],
     })
 
     const parsed = parseUri(uri.toString())
@@ -64,10 +64,10 @@ describe('creates and parses provider-hinted-uris', () => {
       parsed.providers[0].multiaddr.toString(),
       maddr.toString()
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, [])
+    assert.deepStrictEqual(parsed.providers[0].tags, [])
   })
 
-  it('creates URI with provider hints (undefined protos)', () => {
+  it('creates URI with provider hints (undefined tags)', () => {
     const base = `https://example.com/ipfs/${cidStr}`
     const uri = createUri({
       base,
@@ -81,15 +81,15 @@ describe('creates and parses provider-hinted-uris', () => {
       parsed.providers[0].multiaddr.toString(),
       maddr.toString()
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, [])
+    assert.deepStrictEqual(parsed.providers[0].tags, [])
   })
 
-  it('creates URI with provider hints (with protos)', () => {
+  it('creates URI with provider hints (with tags)', () => {
     const base = `https://example.com/ipfs/${cidStr}`
-    const protos = ['http', 'bitswap']
+    const tags = ['http', 'bitswap']
     const uri = createUri({
       base,
-      providers: [{ multiaddr: maddr, protos }],
+      providers: [{ multiaddr: maddr, tags }],
     })
 
     const parsed = parseUri(uri.toString())
@@ -97,17 +97,17 @@ describe('creates and parses provider-hinted-uris', () => {
     assert.strictEqual(parsed.providers.length, 1)
     assert.strictEqual(
       parsed.providers[0].multiaddr.toString(),
-      `${maddr.toString()}/retrieval/http/retrieval/bitswap`
+      `${maddr.toString()}/tag/http/tag/bitswap`
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, protos)
+    assert.deepStrictEqual(parsed.providers[0].tags, tags)
   })
 
-  it('creates URI with multiple provider hints (mixed protos)', () => {
+  it('creates URI with multiple provider hints (mixed tags)', () => {
     const base = `https://example.com/ipfs/${cidStr}`
     const providers = [
-      { multiaddr: multiaddr('/ip4/1.2.3.4/tcp/1234/ws'), protos: ['bitswap'] },
-      { multiaddr: multiaddr('/ip4/5.6.7.8/tcp/443/https'), protos: ['http'] },
-      { multiaddr: multiaddr('/dnsaddr/provider.example.com'), protos: [] },
+      { multiaddr: multiaddr('/ip4/1.2.3.4/tcp/1234/ws'), tags: ['bitswap'] },
+      { multiaddr: multiaddr('/ip4/5.6.7.8/tcp/443/https'), tags: ['http'] },
+      { multiaddr: multiaddr('/dnsaddr/provider.example.com'), tags: [] },
     ]
 
     const uri = createUri({ base, providers })
@@ -118,25 +118,25 @@ describe('creates and parses provider-hinted-uris', () => {
 
     assert.strictEqual(
       parsed.providers[0].multiaddr.toString(),
-      `${providers[0].multiaddr}/retrieval/bitswap`
+      `${providers[0].multiaddr}/tag/bitswap`
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, ['bitswap'])
+    assert.deepStrictEqual(parsed.providers[0].tags, ['bitswap'])
 
     assert.strictEqual(
       parsed.providers[1].multiaddr.toString(),
-      `${providers[1].multiaddr}/retrieval/http`
+      `${providers[1].multiaddr}/tag/http`
     )
-    assert.deepStrictEqual(parsed.providers[1].protos, ['http'])
+    assert.deepStrictEqual(parsed.providers[1].tags, ['http'])
 
     assert.strictEqual(
       parsed.providers[2].multiaddr.toString(),
       providers[2].multiaddr.toString()
     )
-    assert.deepStrictEqual(parsed.providers[2].protos, [])
+    assert.deepStrictEqual(parsed.providers[2].tags, [])
   })
 
-  it('parses provider with trailing retrieval and no protocol', () => {
-    const ma = '/ip4/1.2.3.4/tcp/1234/retrieval'
+  it('parses provider with trailing tag and no protocol', () => {
+    const ma = '/ip4/1.2.3.4/tcp/1234/tag'
     const base = `https://example.com/ipfs/${cidStr}`
     const url = new URL(base)
     url.searchParams.append('provider', ma)
@@ -144,23 +144,23 @@ describe('creates and parses provider-hinted-uris', () => {
     assert.strictEqual(parsed.providers.length, 0)
   })
 
-  it('parses retrieval hint with unknown protocol', () => {
-    const ma = '/ip4/1.2.3.4/tcp/1234/retrieval/magicretrieval'
+  it('parses tag hint with unknown protocol', () => {
+    const ma = '/ip4/1.2.3.4/tcp/1234/tag/magictag'
     const base = `https://example.com/ipfs/${cidStr}`
     const url = new URL(base)
     url.searchParams.append('provider', ma)
     const parsed = parseUri(url.toString())
     assert.strictEqual(parsed.providers.length, 1)
-    assert.deepStrictEqual(parsed.providers[0].protos, ['magicretrieval'])
+    assert.deepStrictEqual(parsed.providers[0].tags, ['magictag'])
   })
 
   it('handles multiple provider hints, some invalid', () => {
     const base = `https://example.com/ipfs/${cidStr}`
-    const appendedMultiaddr = `${maddr.toString()}/retrieval/bitswap`
+    const appendedMultiaddr = `${maddr.toString()}/tag/bitswap`
     const url = new URL(base)
     url.searchParams.append('provider', appendedMultiaddr)
     url.searchParams.append('provider', 'bad-ma')
-    const appendedMultiaddr2 = '/ip4/5.6.7.8/tcp/4321/https/retrieval/http'
+    const appendedMultiaddr2 = '/ip4/5.6.7.8/tcp/4321/https/tag/http'
     url.searchParams.append('provider', appendedMultiaddr2)
     const parsed = parseUri(url.toString())
     assert.strictEqual(parsed.providers.length, 2)
@@ -168,19 +168,19 @@ describe('creates and parses provider-hinted-uris', () => {
       parsed.providers[0].multiaddr.toString(),
       appendedMultiaddr
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, ['bitswap'])
+    assert.deepStrictEqual(parsed.providers[0].tags, ['bitswap'])
     assert.strictEqual(
       parsed.providers[1].multiaddr.toString(),
       appendedMultiaddr2
     )
-    assert.deepStrictEqual(parsed.providers[1].protos, ['http'])
+    assert.deepStrictEqual(parsed.providers[1].tags, ['http'])
   })
 
   it('ignores invalid multiaddr hints during parsing', () => {
     const base = `https://example.com/ipfs/${cidStr}`
     const url = new URL(base)
     // Add a malformed multiaddr as a provider hint
-    url.searchParams.append('provider', '/not/a/real/multiaddr/retrieval/http')
+    url.searchParams.append('provider', '/not/a/real/multiaddr/tag/http')
     const parsed = parseUri(url.toString())
     assert.deepStrictEqual(parsed.cid.toString(), cidStr)
     assert.deepStrictEqual(parsed.providers, [])
@@ -225,12 +225,12 @@ describe('creates and parses provider-hinted-uris', () => {
       providers: [
         {
           multiaddr: maddr,
-          protos: ['http', 'bitswap'],
+          tags: ['http', 'bitswap'],
         },
       ],
     })
 
-    const expectedProvider = `${maddr.toString()}/retrieval/http/retrieval/bitswap`
+    const expectedProvider = `${maddr.toString()}/tag/http/tag/bitswap`
     const parsed = parseUri(url.toString())
 
     assert.strictEqual(parsed.cid.toString(), cidStr)
@@ -240,7 +240,7 @@ describe('creates and parses provider-hinted-uris', () => {
       parsed.providers[0].multiaddr.toString(),
       expectedProvider
     )
-    assert.deepStrictEqual(parsed.providers[0].protos, ['http', 'bitswap'])
+    assert.deepStrictEqual(parsed.providers[0].tags, ['http', 'bitswap'])
   })
 
   it('adds leading slash if path does not start with /', () => {
@@ -294,7 +294,7 @@ describe('creates and parses provider-hinted-uris', () => {
         createUri({
           base,
           /** @ts-expect-error */
-          providers: [{ multiaddr: 'not-a-ma', protos: [] }],
+          providers: [{ multiaddr: 'not-a-ma', tags: [] }],
         }),
       /multiaddr must be a Multiaddr instance/
     )
@@ -304,23 +304,23 @@ describe('creates and parses provider-hinted-uris', () => {
 describe('parseQueryString', () => {
   const maddr = multiaddr('/ip4/1.2.3.4/tcp/1234')
 
-  it('parses single provider hint with multiple retrieval markers', () => {
+  it('parses single provider hint with multiple tag markers', () => {
     const input = `?provider=${encodeURIComponent(
-      `${maddr.toString()}/retrieval/http/retrieval/bitswap`
+      `${maddr.toString()}/tag/http/tag/bitswap`
     )}`
     const providers = parseQueryString(input)
     assert.strictEqual(providers.length, 1)
     assert.strictEqual(
       providers[0].multiaddr.toString(),
-      `${maddr.toString()}/retrieval/http/retrieval/bitswap`
+      `${maddr.toString()}/tag/http/tag/bitswap`
     )
-    assert.deepStrictEqual(providers[0].protos, ['http', 'bitswap'])
+    assert.deepStrictEqual(providers[0].tags, ['http', 'bitswap'])
   })
 
   it('parses multiple valid provider hints', () => {
     const hints = [
-      `${maddr.toString()}/retrieval/http`,
-      '/ip4/5.6.7.8/tcp/4321/https/retrieval/bitswap',
+      `${maddr.toString()}/tag/http`,
+      '/ip4/5.6.7.8/tcp/4321/https/tag/bitswap',
       '/dnsaddr/provider.example.com',
     ]
     const query = hints
@@ -330,24 +330,24 @@ describe('parseQueryString', () => {
 
     assert.strictEqual(providers.length, 3)
     assert.strictEqual(providers[0].multiaddr.toString(), hints[0])
-    assert.deepStrictEqual(providers[0].protos, ['http'])
+    assert.deepStrictEqual(providers[0].tags, ['http'])
 
     assert.strictEqual(providers[1].multiaddr.toString(), hints[1])
-    assert.deepStrictEqual(providers[1].protos, ['bitswap'])
+    assert.deepStrictEqual(providers[1].tags, ['bitswap'])
 
     assert.strictEqual(providers[2].multiaddr.toString(), hints[2])
-    assert.deepStrictEqual(providers[2].protos, [])
+    assert.deepStrictEqual(providers[2].tags, [])
   })
 
   it('ignores malformed multiaddrs', () => {
-    const valid = `${maddr.toString()}/retrieval/http`
+    const valid = `${maddr.toString()}/tag/http`
     const query = `provider=${encodeURIComponent(
       valid
     )}&provider=not-a-ma&provider=/gibber/ish`
     const providers = parseQueryString(`?${query}`)
     assert.strictEqual(providers.length, 1)
     assert.strictEqual(providers[0].multiaddr.toString(), valid)
-    assert.deepStrictEqual(providers[0].protos, ['http'])
+    assert.deepStrictEqual(providers[0].tags, ['http'])
   })
 
   it('ignores provider values not starting with "/"', () => {
@@ -358,38 +358,36 @@ describe('parseQueryString', () => {
       providers[0].multiaddr.toString(),
       '/ip4/1.1.1.1/tcp/4001'
     )
-    assert.deepStrictEqual(providers[0].protos, [])
+    assert.deepStrictEqual(providers[0].tags, [])
   })
 
   it('ignores empty provider values', () => {
-    const query = 'provider=&provider=/ip4/2.2.2.2/tcp/1234/retrieval/bitswap'
+    const query = 'provider=&provider=/ip4/2.2.2.2/tcp/1234/tag/bitswap'
     const providers = parseQueryString(`?${query}`)
     assert.strictEqual(providers.length, 1)
     assert.strictEqual(
       providers[0].multiaddr.toString(),
-      '/ip4/2.2.2.2/tcp/1234/retrieval/bitswap'
+      '/ip4/2.2.2.2/tcp/1234/tag/bitswap'
     )
-    assert.deepStrictEqual(providers[0].protos, ['bitswap'])
+    assert.deepStrictEqual(providers[0].tags, ['bitswap'])
   })
 
-  it('supports unknown retrieval protocols', () => {
+  it('supports unknown tag protocols', () => {
     const input = `?provider=${encodeURIComponent(
-      `${maddr.toString()}/retrieval/magic`
+      `${maddr.toString()}/tag/magic`
     )}`
 
     const providers = parseQueryString(input)
     assert.strictEqual(providers.length, 1)
     assert.strictEqual(
       providers[0].multiaddr.toString(),
-      `${maddr.toString()}/retrieval/magic`
+      `${maddr.toString()}/tag/magic`
     )
-    assert.deepStrictEqual(providers[0].protos, ['magic'])
+    assert.deepStrictEqual(providers[0].tags, ['magic'])
   })
 
-  it('ignores trailing /retrieval without proto', () => {
-    const input = `?provider=${encodeURIComponent(
-      `${maddr.toString()}/retrieval`
-    )}`
+  it('ignores trailing /tag without proto', () => {
+    const input = `?provider=${encodeURIComponent(`${maddr.toString()}/tag`)}`
     const providers = parseQueryString(input)
     assert.strictEqual(providers.length, 0)
   })
@@ -400,11 +398,11 @@ describe('parseQueryString', () => {
   })
 
   it('decodes percent-encoded multiaddrs correctly', () => {
-    const raw = `${maddr.toString()}/retrieval/bitswap`
+    const raw = `${maddr.toString()}/tag/bitswap`
     const encoded = encodeURIComponent(raw)
     const providers = parseQueryString(`?provider=${encoded}`)
     assert.strictEqual(providers.length, 1)
     assert.strictEqual(providers[0].multiaddr.toString(), raw)
-    assert.deepStrictEqual(providers[0].protos, ['bitswap'])
+    assert.deepStrictEqual(providers[0].tags, ['bitswap'])
   })
 })

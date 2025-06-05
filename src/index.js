@@ -1,6 +1,6 @@
 import * as API from './api.js'
 
-import { multiaddr, isMultiaddr } from '@multiformats/multiaddr'
+import { multiaddr, isMultiaddr } from '@vascosantos/multiaddr'
 import { CID } from 'multiformats/cid'
 
 /**
@@ -36,8 +36,8 @@ export function createUri({ base, path, providers = [] }) {
     const baseParts = provider.multiaddr.toString().split('/')
     const hintParts = [...baseParts]
 
-    for (const proto of provider.protos || []) {
-      if (proto) hintParts.push('retrieval', proto)
+    for (const tag of provider.tags || []) {
+      if (tag) hintParts.push('tag', tag)
     }
 
     const hint = '/' + hintParts.filter(Boolean).join('/')
@@ -49,7 +49,7 @@ export function createUri({ base, path, providers = [] }) {
 
 /**
  * Parse a provider-hinted URI into a CID and structured provider hints,
- * preserving the full multiaddr including `/retrieval/<proto>` segments.
+ * preserving the full multiaddr including `/tag/<tag-name>` segments.
  *
  * @param {string} uri
  * @returns {{ cid: API.CID, providers: API.ProviderHint[], path: string, protocol: string }}
@@ -85,13 +85,13 @@ export function parseQueryString(query) {
 
     const protoParts = val.split('/').filter(Boolean)
     /** @type {string[]} */
-    const protos = []
+    const tags = []
 
     for (let i = 0; i < protoParts.length; ) {
-      if (protoParts[i] === 'retrieval') {
+      if (protoParts[i] === 'tag') {
         i++
         if (i < protoParts.length) {
-          protos.push(protoParts[i])
+          tags.push(protoParts[i])
           i++
         }
       } else {
@@ -101,7 +101,7 @@ export function parseQueryString(query) {
 
     try {
       const m = multiaddr(val)
-      providers.push({ multiaddr: m, protos })
+      providers.push({ multiaddr: m, tags })
     } catch {
       // Skip malformed multiaddrs
       continue
