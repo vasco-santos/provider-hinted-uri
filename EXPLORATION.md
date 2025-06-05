@@ -2,13 +2,13 @@
 
 ## Abstract
 
-This document explores the concept of a URI-based format for expressing content-addressed identifiers (such as IPFS CIDs) optionally augmented with one or more provider hints. This format aims to support a simple, unopinionated, transport-agnostic scheme to simplify data retrieval in content-addressable systems by introducing a clear, extensible, and broadly compatible URI format.
+This document explores the concept of a URI-based format for expressing content-addressed identifiers (CIDs) optionally augmented with one or more provider hints. This format aims to support a simple, unopinionated, transport-agnostic scheme to simplify data retrieval in content-addressable systems by introducing a clear, extensible, and broadly compatible URI format.
 
 ## Background
 
-Content-addressable systems, such as IPFS, allow data to be identified by the hash of its contents (CID), enabling verifiable, immutable references. However, retrieving content typically relies on side content discovery systems (e.g. DHT, IPNI), even when a client MAY know one (or more) provider of the bytes. A provider in this context is any node, peer, gateway, or service that can serve content identified by a CID.
+Content-addressable systems, such as IPFS and Iroh, allow data to be identified by the hash of its contents (CID), enabling verifiable, immutable references. However, retrieving content typically relies on side content discovery systems (e.g. DHT, IPNI), even when a client MAY know one (or more) provider of the bytes. A provider in this context is any node, peer, gateway, or service that can serve content identified by a CID.
 
-Existing solutions (e.g., magnet URIs, RASL) propose alternative ideas where provider hints are encoded next to the content identifier. This document aims to explore this space in more detail, focusing particularly on ergonomics, extensibility, and ease of adoption.
+Existing solutions (e.g., magnet URIs, RASL, [webrtc hints](https://github.com/ipfs-shipyard/ipfs-share-files/pull/206)) propose alternative ideas where provider hints are encoded next to the content identifier. This document aims to explore this space in more detail, focusing particularly on ergonomics, extensibility, and ease of adoption.
 
 ## Requirements, Goals, and Non-Goals
 
@@ -54,35 +54,44 @@ This section defines the core motivations and constraints guiding the design of 
 
 ## 🎨 URI Design
 
-This section defines a URI format for expressing a content identifier (CID) along with optional provider hints that **guide clients** on how/where to fetch the associated content. The format is intended to be directly compatible with both IPFS Gateway URLs and `ipfs://` scheme URIs, while preserving flexibility and extensibility to also be compatible with other systems or upgrades.
+This section defines a URI format for expressing a content identifier (CID) along with optional provider hints that **guide clients** on how/where to fetch the associated content. The format is intended to be directly compatible with HTTP based systems (e.g. IPFS Gateway URLs) and `ipfs://` scheme URIs, while preserving flexibility and extensibility to also be compatible with other systems or upgrades.
 
 Please note that the current format is not intended to fully specify all identified use cases or requirements. But focus on leaving the door open to more in depth specifications for specific cases.
 
 ### 📐 Format
 
-The proposed URI format introduces a new optional query parameter `provider`, which may appear one or more times. Each `provider` value represents a content provider hint and is composed by a `multiaddr` string. The `provider` parameter is optional, and clients MAY ignore it.
+The proposed URI format introduces a new optional query parameter `provider`, which may appear one or more times. Each `provider` value represents a content provider hint and is composed by a `multiaddr` string, or an `HTTP URL string`. The `provider` parameter is optional, and clients MAY ignore it.
 
 The base format is:
 
 ```sh!
-[ipfs://<CID> | https://<gateway>/ipfs/<CID> | https://<CID>.ipfs.<gateway> ]?[provider=<multiaddr1>&provider=<multiaddr22>&...]
+[ipfs://<CID> | https://<gateway>/ipfs/<CID> | https://<CID>.ipfs.<gateway> ]?[provider=<multiaddr1>&provider=<multiaddr22>&provider=<http-url-string>...]
 ```
 
 #### Query Parameter: `provider`
 
 - Name: `provider`
 - Type: URI Query Parameter (repeating allowed)
-- Value: Multiaddr string (`?provider=multiaddr`).
-- Interpretation: Optional hint for how to fetch and locate the content identified by the CID
-- The `multiaddr` MAY include application level private tuples to specify the retrieval protocols supported (e.g. `/ip4/.../p2p/qmfoo/retrieval/bitswap/retrieval/http`), in order to enable the client to avoid unecessary interactions with providers (e.g. no need for protocol probing or identification). Including it is encouraged for low-latency, non-interactive lookups.
+- Value: Either a Multiaddr string (`?provider=multiaddr`) or HTTP URL string (`?provider=http-url`) that can be transformed to Multiaddr.
+- Interpretation: An optional hint for how to locate and fetch the content identified by the CID
+- When using a `multiaddr`, the address MAY include application-level private tuples to express supported fetching protocols (e.g. `/ip4/.../p2p/qmfoo/tag/bitswap-v1.2.0/tag/tgw-v1`). This enables clients to have non-interactive lookups and avoid unnecessary connection overhead—such as protocol negotiation or probing. It is recommended for low-latency, trustless content fetching.
+- Alternatively, a `HTTP URL String` may be used to simplify usage, especially for content providers without protocol specific infrastructure or multiaddr knowledge. While this approach is easy to adopt, it trades off flexibility:
+  - Only HTTP(S) is supported as the transport layer.
+  - Protocols available to fetch data cannot be specified explicitly.
+  - It is implicitly assumed that the server responds with raw bytes hashed using SHA-256, for verification purposes against the CID provided.
 
 ### Retrieval Protocol Code Registry (Informative)
 
-| Protocol Code | Description               |
-| ------------- | ------------------------- |
-| http          | Trustless IPFS Gateway v1 |
-| bitswap       | IPFS Bitswap protocol     |
-| graphsync     | GraphSync protocol        |
+The next table includes informative protocol codes. They are not specified nor agreed on at the time of writing.
+
+| Protocol Code | Description                                       |
+| ------------- | ------------------------------------------------- |
+| tgw-v1          | Trustless IPFS Gateway v1 (raw blocks and CAR)    |
+| tgw-v1-raw | Trustless IPFS Gateway v1 for serving raw blocks  |
+| tgw-v1-car | Trustless IPFS Gateway v1 for serving CAR files   |
+| octets      | Static server serving bytes hashed with sha256    |
+| rasl          | Content-addressed resources hosted in RASL server |
+| bitswap-v1.2.0       | IPFS Bitswap protocol                             |
 
 ### 🧠 Parsing
 
@@ -130,13 +139,14 @@ If a CID is present in both a multi-dotted origin and in the path (even if they 
 
 #### Query Parsing (`provider` Parameters)
 
-Once a CID has been successfully extracted, clients MAY parse `provider` parameters from the query string. Each `provider` value represents a provider hint, encoded as a multiaddr string.
+Once a CID has been successfully extracted, clients MAY parse `provider` parameters from the query string. Each `provider` value represents a provider hint, encoded as either a Multiaddr string (`?provider=multiaddr`) or HTTP URL string (`?provider=http-url`) that can be transformed to Multiaddr
 
 **1. Parsing Rules**
 
 - The `provider` query parameter MAY appear multiple times.
-- CLients MUST split each `provider` multiaddr by its components, so that they can look at encoded supported protocol codes.
-- If no supported protocols are present, treat the entire value as a multiaddr with no protocol hint.
+- If the provider is NOT a `multiadrr`, it MUST be a `http(s)` like URL and, therefore transformable to `multiaddr` behind the scenes. When this is the case, the `octets` protocol is expected.
+- Clients MUST split each `provider` multiaddr by its components, so that they can look at encoded tags for supported protocol codes.
+- If no supported protocols are present, treat the entire value as a multiaddr with no specific protocol.
 - Each `provider` parameter MUST be treated as an independent, optional provider hint.
 - Clients MAY ignore hints with unknown protocol codes.
 
@@ -157,26 +167,26 @@ Note that the `multiaddr` string should point to the `origin` server where given
 #### Example Parsing Flows
 
 **Input URI:**
-`https://bafy....ipfs.dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http`
+`https://bafy....ipfs.dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/tag/tgw-v1`
 → **REJECT** (CID appears in both hostname and path)
 
 **Input URI:**
-`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http&provider=/ip4/192.0.2.1/tcp/4001/ws/retrieval/bitswap`
+`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/tag/tgw-v1&provider=/ip4/192.0.2.1/tcp/4001/ws/tag/bitswap-v1.2.0`
 
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http`
-2. `/ip4/192.0.2.1/tcp/4001/ws` using `bitswap`
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `tgw-v1`
+2. `/ip4/192.0.2.1/tcp/4001/ws` using `bitswap-v1.2.0`
    → Attempt connections via hints or fall back to default resolution.
 
 **Input URI:**
-`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/retrieval/http/retrieval/bitswap`
+`https://dweb.link/ipfs/bafy...?provider=/dns/hash-stream-like-server.io/tcp/443/https/tag/tgw-v1/tag/bitswap-v1.2.0`
 
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http` or `bitswap`
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `tgw-v1` or `bitswap-v1.2.0`
    → Attempt connections via hints or fall back to default resolution.
 
 **Input URI:**
@@ -185,7 +195,17 @@ Note that the `multiaddr` string should point to the `origin` server where given
 → Extract CID: `bafy...`
 → Parse `provider` params:
 
-1. `/dns/hash-stream-like-server.io/tcp/443/https` using `http` (while not explicit, client MAY infer it by http like multiaddr)
+1. `/dns/hash-stream-like-server.io/tcp/443/https` using `tgw-v1` (while not explicit, client MAY infer it by http like multiaddr)
+
+**Input URI:**
+`ipfs://bafk...?provider=https://foo.bar/example-framework.js`
+
+→ Extract CID: `bafk...`
+→ Parse `provider` params:
+
+1. After verifying it is not a multiaddr, parse it as a URL and transform it to a valid multiaddr with `octets` 
+2. `/dns/foo.bar/tcp/443/https/http-path/example-framework.js` using `octets`
+   → Attempt connections via hints or fall back to default resolution.
 
 ### Client Behavior and potential Server Roles
 
@@ -230,17 +250,112 @@ This flexibility supports a spectrum of use cases—from fully local client-side
 ```
 https://example.gateway.io/ipfs/bafy...?
   provider=/dns/my-hash-stream-server.com/tcp/443/https
-  &provider=/ip4/98.10.2.1/tcp/8000/ws/retrieval/http
+ &provider=/ip4/98.10.2.1/tcp/8000/ws/tag/tgw-v1
 ```
 
 ### Compatible with `ipfs://` URI
 
-```
+```!
 ipfs://bafy...?
-  provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http
+  provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1
 ```
 
 These providers hints can be evaluated by clients in any order (sequentially or in parallel), or ignored entirely if unsupported.
+
+## Use cases
+
+The proposed **Provider-Hinted URI** format aims to enable "non interactive" content-addressable retrieval by enabling smart clients to fetch bytes directly from specified providers. This allows for reduced latency, lower load on discovery systems, and improved resiliency. Below are key use cases where this format brings immediate benefits.
+
+### 1. IPFS Content Provider
+
+In systems like IPFS, clients typically rely on third party discovery systems (e.g., DHT, IPNI) to locate providers for a CID. While such decentralized systems provide robustness and fault tolerance, this comes at a cost. Namely sprawling complexity for record publishers and significant latency for clients. Moreover, they may themselves become a bottleneck to serve data if they are facing production problems.
+
+Using **Provider-Hinted URIs** clients have an option to reach content without relying on discovery systems, while still being able to rely on such systems as a fallback:
+
+```sh!
+ipfs://bafy...?
+  provider=/dns/my-hash-stream-server.com/tcp/443/https
+  &provider=/dns/w3s.link/tcp/443/https
+```
+
+A smart client MAY try these providers directly using HTTP (e.g., Trustless Gateway Spec), verifying content against the CID. The client can fetch the content behind the CID `bafy...` directly from the host `my-hash-stream-server.com` or `w3s.link` using the IPFS protocol.
+
+If the providers are offline or fail, the client can fall back to discovery systems.
+
+### 2. Skipping Multi-hop discovery
+
+IPFS and libp2p networks support a wide range of protocols. Nodes can decide which protocols and transports they support based on preference or running environment. This flexibility brings a lot of power to the network. Multiaddrs commonly include the transport information but do not include the underlying protocols supported to serve content. As a result, the two sides must negotiate shared protocols post-connection. This leads to unnecessary round trips or failed connections when no common protocol exists. On the Trustless IPFS Gateway side of things, clients MAY probe a gateway to figure out its support by performing extra HTTP requests to some well-defined HTTP routes.
+
+Clients can avoid protocol negotiation and probing with **Provider-Hinted URIs**, while still using them as fallback.
+
+In the following URI example, a smart client MAY attempt to fetch directly the content behind the CID `bafy...` from the host `my-hash-stream-server.com` or `w3s.link` using the IPFS protocol via HTTP. The encoded information for `my-hash-stream-server.com` hints it supports fetching with protocol `tgw-v1`, while `w3s.link` hints it only supports the `tgw-v1-raw` protocol. Depending on the request, the client MAY decide which provider fits better or try both.
+
+```sh!
+ipfs://bafy...?
+  provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1
+  &provider=/dns/w3s.link/tcp/443/https/tag/tgw-v1-raw
+```
+
+Providers MAY have only non-HTTP transports to retrieve data. In the next URI example, a smart client MAY attempt to fetch the content behind the CID `bafy...` from the host `my-hash-stream-other-server.com` using the IPFS protocol via WS transport. However, clients can quickly determine compatibility before dialing by checking the embedded tags.
+
+```sh!
+ipfs://bafy...
+  ?provider=/dns/my-hash-stream-other-server.com/tcp/443/ws/p2p/QmNode/tag/bitswap-v1.2.0/tag/graphsync
+```
+
+Similarly, RASL enables encoding of providers indirectly via hosted resources in `https://${host}/.well-known/rasl/${cid}`. The big advantage of RASL in this context is that one can change the record to point to somewhere else, without requiring content publishers to update all their references for the content. However, it comes at the cost of requiring interactivity with this extra hop, and depending on it to be reachable.
+
+Next follows a URI example relying on RASL to fetch some bytes behind a CID. A smart client CAN construct the URL for the resource hosted on the RASL server by extracting the host `my-rasl-server.com` from the provider multiaddr and fetching the resource as `https://my-rasl-server.com/.well-known/rasl/bafy...`
+
+```sh!
+ipfs://bafy...
+  ?provider=/dns/my-rasl-server.com/tcp/443/https/tag/rasl
+```
+
+Alternatively, one can encode the HTTP path in the multiaddr instead of relying on the smart client to know how to interpret RASL requests:
+
+```sh!
+ipfs://bafy...
+  ?provider=/dns/my-rasl-server.com/tcp/443/https/http-path/.well-known%2Frasl%2Fbafy...
+```
+
+In the `rasl` case, the hop to the rasl server is still required. However, the ergonomics around updating providers MAY be desirable for some content publishers.
+
+### 3. Pre-seeding & Edge Caching
+
+In CDN or edge cache environments, Provider-Hinted URIs allow pre-seeding of content at strategic locations. Edge nodes can advertise themselves using provider hints, enabling locality-aware clients to fetch content faster.
+
+Example:
+
+```sh!
+ipfs://bafy...
+  ?provider=/dns/cache-berlin.example.com/tcp/443/https
+```
+
+This benefits latency-sensitive apps like video streaming or web app loading.
+
+### 4. Subresource Integrity for Static Servers
+
+[Subresource Integrity (SRI)](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) is a widely used standard on the web. It is a security feature that enables browsers to verify that resources they fetch are what they expect. It looks like:
+
+```html!
+<script
+  src="https://example.com/example-framework.js"
+  integrity="sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/uxy9rx7HNQlGYl1kPzQho1wx4JwY8wC"
+  crossorigin="anonymous"></script>
+```
+
+The `Provider-Hinted URIs` can perform this out of the box by encoding the CID together with the location of the resource in any static server (nginx like) as follows:
+
+```sh!
+ipfs://bafk...
+  ?provider=https://foo.bar/example-framework.js
+  &provider=/dns/example.com/tcp/443/https/http-path/example-framework.js/tag/octets
+```
+
+A smart client can parse the hint, obtaining the host `example.com`, the path `example-framework.js`, and the tag protocol `octets`. With this, the client can create the resource URL `https://example.com/example-framework.js`, fetch the resource, hash the bytes with `sha256`, and verify that the bytes match the requested CID.
+
+Similarly, package managers and builds (e.g., NPM, Docker) could store and resolve content-addressed URIs enhanced with provider hints in order to guarantee verifiability in a similar way as described here.
 
 ## Inspiration Sources
 
@@ -261,7 +376,7 @@ This document provides a foundational format but leaves room for future refineme
 ### Human-Friendly URI Format
 
 ```txt!
-https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http
+https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/tag/tgw-v1
 ```
 
 - Easy to paste into a browser.
@@ -273,14 +388,14 @@ https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https
 If you paste this URI into a browser:
 
 ```txt!
-ipfs://bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http
+ipfs://bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/tag/tgw-v1
 ```
 
 - The browser encodes unsafe characters like `/` and `:`.
 - Internally it becomes:
 
 ```txt!
-ipfs://bafy...?provider=%2Fdns%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Aretrieval%2Fhttp
+ipfs://bafy...?provider=%2Fdns%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Atag%2Ftgw-v1
 ```
 
 ✅ This is expected and does not affect usability.
@@ -288,10 +403,10 @@ ipfs://bafy...?provider=%2Fdns%2Fmy-hash-stream-server%2Ftcp%2F443%2Fhttps%3Aret
 #### 🧪 JavaScript (Browser or Node.js)
 
 ```js!
-const url = new URL("https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http");
+const url = new URL("https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/tag/tgw-v1");
 const hints = url.searchParams.getAll("provider");
 for (const hint of hints) {
-  console.log("Multiaddr:", hint);  // "/dns/my-hash-stream-server/tcp/443/https/retrieval/http"
+  console.log("Multiaddr:", hint);  // "/dns/my-hash-stream-server/tcp/443/https/tag/tgw-v1"
 }
 ```
 
@@ -302,7 +417,7 @@ for (const hint of hints) {
 #### 💻 CLI Usage
 
 ```sh!
-curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/retrieval/http"
+curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server/tcp/443/https/tag/tgw-v1"
 ```
 
 - ✅ Use quotes (`"..."` or `'...'`) if your shell interprets special characters.
@@ -341,8 +456,8 @@ Works great in:
 | Use Case                                      | URI                                                                                                                                                         |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ✅ **Basic IPFS URI with no hints**           | `ipfs://bafy...`                                                                                                                                            |
-| ✅ **Gateway-compatible form with HTTP hint** | `https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http`                                                      |
-| ✅ **Multiple hints (HTTP + libp2p)**         | `ipfs://bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http &provider=/dns/peer.ipfs.io/tcp/4001/p2p/QmPeerID/retrieval/bitswap` |
+| ✅ **Gateway-compatible form with HTTP hint** | `https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1`                                                      |
+| ✅ **Multiple hints (HTTP + libp2p)**         | `ipfs://bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1 &provider=/dns/peer.ipfs.io/tcp/4001/p2p/QmPeerID/tag/bitswap-v1.2.0` |
 | ❌ **Unsupported client**                     | Client ignores `provider` param and uses default discovery (e.g., DHT/IPNI)                                                                                 |
 
 ### Usage & Adoption
@@ -362,11 +477,13 @@ Clients MAY evaluate hints sequentially or in parallel and MAY prioritize based 
 This format is designed to be easily usable in CLI pipelines and automation flows. For example:
 
 ```sh!
-curl-like "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
+curl-like "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1" | <verifier> | <consumer-app>
 ```
 
 Assuming curl at some point would adopt content addressable verifiable client, it could look like:
 
 ```sh!
-curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/retrieval/http" | <verifier> | <consumer-app>
+curl "https://dweb.link/ipfs/bafy...?provider=/dns/my-hash-stream-server.com/tcp/443/https/tag/tgw-v1" | <verifier> | <consumer-app>
 ```
+
+---
