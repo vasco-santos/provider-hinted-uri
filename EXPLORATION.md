@@ -144,7 +144,7 @@ Once a CID has been successfully extracted, clients MAY parse `provider` paramet
 **1. Parsing Rules**
 
 - The `provider` query parameter MAY appear multiple times.
-- If the provider is NOT a `multiadrr`, it MUST be a `http(s)` like URL and, therefore transformable to `multiaddr` behind the scenes. When this is the case, the `octets` protocol is expected.
+- If the provider value starts with a `/` it MUST be parsed as a `multiaddr`. Otherwise, it should be parsed as a `http(s)` like URL and, therefore transformable to `multiaddr` behind the scenes. When this is the case, the `octets` protocol is expected.
 - Clients MUST split each `provider` multiaddr by its components, so that they can look at encoded tags for supported protocol codes.
 - If no supported protocols are present, treat the entire value as a multiaddr with no specific protocol.
 - Each `provider` parameter MUST be treated as an independent, optional provider hint.
